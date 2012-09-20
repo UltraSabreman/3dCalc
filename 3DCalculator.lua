@@ -4,8 +4,6 @@ local Min = -Vector(5,5,5)
 local Max = Vector(5,5,5)
 
 local GridStep = Vector(1,1,1)
-local GridMin = Min
-local GridMax = Max
 local Ratio = Vector(1,1,1) --todo
 local TimeStep = 0.05
 local AxisColoring = false 
@@ -21,7 +19,6 @@ local RenderMode = "solid+wire" --"wire","solid","solid+wire",
 Optional:
 [X] 5) Figure out how to get rid of the tangent lines....
 ]]
---sdfs
 
 local SmallHudFont = {
 	font = "Times New Roman",
@@ -203,7 +200,7 @@ local function checkFails(Range, ...)
 	local Flag = false
 
 	for i,v in pairs(verts) do
-		Flag = (v.Z < (GridMin.Z - VertexStep.Z*2) or v.Z > (GridMax.Z + VertexStep.Z*2))
+		Flag = (v.Z < (Min.Z - VertexStep.Z*2) or v.Z > (Max.Z + VertexStep.Z*2))
 
 		local dFlag
 		for _,l in pairs(verts) do
@@ -225,7 +222,7 @@ function buildMesh(Frames, tMin, tMax)
 
 	local StartTime = SysTime()
 	local TRange = (math.abs(tMin) + math.abs(tMax)) or 1
-	local GRange = math.abs(GridMin.Z - GridMax.Z)
+	local GRange = math.abs(Min.Z - Max.Z)
 	
 	for i = 1, Frames do
 		if(Meshes[i]) then
@@ -239,16 +236,16 @@ function buildMesh(Frames, tMin, tMax)
 		local meshData = {}
 		local Points = {}
 
-		local Lowest = GridMax.Z
-		local Highest = GridMin.Z
+		local Lowest = Min.Z
+		local Highest = Max.Z
 		if(AxisColoring) then
-			Lowest = GridMin.Z
-			Highest = GridMax.Z
+			Lowest = Min.Z
+			Highest = Max.Z
 		end	
 
 		for X = Min.X, Max.X, (VertexStep.X) do
 			for Y = Min.Y, Max.Y, (VertexStep.Y) do
-				local Z = math.Clamp(getZ(X,Y, (MeshId/Frames)*TRange + tMin ), GridMin.Z - VertexStep.Z, GridMax.Z + VertexStep.Z) --todo
+				local Z = math.Clamp(getZ(X,Y, (MeshId/Frames)*TRange + tMin ), Min.Z - VertexStep.Z, Max.Z + VertexStep.Z) --todo
 
 				if(!AxisColoring) then
 					Lowest = math.min(Lowest, Z)
@@ -370,8 +367,8 @@ local function MeshBuildManager(a,b,c)
 end
 
 local function drawGrid()
-	local Min = GridMin
-	local Max = GridMax
+	--local Min = GridMin
+	--local Max = GridMax
 	render.DrawLine(Min, Vector(Max.X + GridStep.X,Min.Y,Min.Z), Color(255,0,0), true)
 	render.DrawLine(Min, Vector(Min.X,Max.Y + GridStep.Y,Min.Z), Color(0,255,0), true)
 	render.DrawLine(Min, Vector(Min.X,Min.Y,Max.Z + GridStep.Z), Color(0,0,255), true)
@@ -484,8 +481,8 @@ end)
 ---------------------------------------------------------------------------
 
 hook.Add("Think", "test", function()
-	GridMin = Min
-	GridMax = Max
+	--GridMin = Min
+	--GridMax = Max
 	if (!ValidEntity(ent) and ValidEntity(LocalPlayer():GetEyeTrace().Entity)) then
 		ent = LocalPlayer():GetEyeTrace().Entity
 		messege("Target Entity Selected.",MESSEGE_TYPE_NOTICE)
