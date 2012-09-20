@@ -1,9 +1,11 @@
 local func = "cos(abs(x)+abs(y))*(abs(x)+abs(y))"
 local VertexStep = Vector(0.3,0.3,0.3)
-local Min = -Vector(5,5,5)
-local Max = Vector(5,5,5)
+local Min = -Vector(3,3,3)
+local Max = Vector(3,3,3)
 
 local GridStep = Vector(1,1,1)
+local GridMin = Min
+local GridMax = Max
 local Ratio = Vector(1,1,1) --todo
 local TimeStep = 0.05
 local AxisColoring = false 
@@ -19,6 +21,7 @@ local RenderMode = "solid+wire" --"wire","solid","solid+wire",
 Optional:
 [X] 5) Figure out how to get rid of the tangent lines....
 ]]
+
 
 local SmallHudFont = {
 	font = "Times New Roman",
@@ -37,12 +40,17 @@ local SmallHudFont = {
 	outline = false,
 }
 surface.CreateFont("Test", SmallHudFont)
-
+local Percent = 0
+local buildRoutine = nil
+local Building = false
+local Kill = false
+local NumMeshes = 0
 local ent = nil
 local RenderMesh = false
 local MeshIndex = 1
 local DrawMatrix = Matrix()
 local Meshes = {}
+local Grid = {}
 local ZoomStates = {
 	{
 		min = Min,
@@ -200,7 +208,7 @@ local function checkFails(Range, ...)
 	local Flag = false
 
 	for i,v in pairs(verts) do
-		Flag = (v.Z < (Min.Z - VertexStep.Z*2) or v.Z > (Max.Z + VertexStep.Z*2))
+		Flag = (v.Z < (GridMin.Z - VertexStep.Z*2) or v.Z > (GridMax.Z + VertexStep.Z*2))
 
 		local dFlag
 		for _,l in pairs(verts) do
@@ -222,7 +230,7 @@ function buildMesh(Frames, tMin, tMax)
 
 	local StartTime = SysTime()
 	local TRange = (math.abs(tMin) + math.abs(tMax)) or 1
-	local GRange = math.abs(Min.Z - Max.Z)
+	local GRange = math.abs(GridMin.Z - GridMax.Z)
 	
 	for i = 1, Frames do
 		if(Meshes[i]) then
@@ -236,16 +244,16 @@ function buildMesh(Frames, tMin, tMax)
 		local meshData = {}
 		local Points = {}
 
-		local Lowest = Min.Z
-		local Highest = Max.Z
+		local Lowest = GridMax.Z
+		local Highest = GridMin.Z
 		if(AxisColoring) then
-			Lowest = Min.Z
-			Highest = Max.Z
+			Lowest = GridMin.Z
+			Highest = GridMax.Z
 		end	
 
 		for X = Min.X, Max.X, (VertexStep.X) do
 			for Y = Min.Y, Max.Y, (VertexStep.Y) do
-				local Z = math.Clamp(getZ(X,Y, (MeshId/Frames)*TRange + tMin ), Min.Z - VertexStep.Z, Max.Z + VertexStep.Z) --todo
+				local Z = math.Clamp(getZ(X,Y, (MeshId/Frames)*TRange + tMin ), GridMin.Z - VertexStep.Z, GridMax.Z + VertexStep.Z) --todo
 
 				if(!AxisColoring) then
 					Lowest = math.min(Lowest, Z)
@@ -320,11 +328,6 @@ function buildMesh(Frames, tMin, tMax)
 	print("Done in: "..(SysTime() - StartTime))
 	messege("Done Generating, took: "..math.Round(SysTime() - StartTime).."s", MESSEGE_TYPE_SUCCESS)
 end
-local Percent = 0
-local buildRoutine = nil
-local Building = false
-local Kill = false
-local NumMeshes = 0
 
 local function getCompleatedMeshes()
 	local num = 0
@@ -366,62 +369,106 @@ local function MeshBuildManager(a,b,c)
 
 end
 
-local function drawGrid()
-	--local Min = GridMin
-	--local Max = GridMax
-	render.DrawLine(Min, Vector(Max.X + GridStep.X,Min.Y,Min.Z), Color(255,0,0), true)
-	render.DrawLine(Min, Vector(Min.X,Max.Y + GridStep.Y,Min.Z), Color(0,255,0), true)
-	render.DrawLine(Min, Vector(Min.X,Min.Y,Max.Z + GridStep.Z), Color(0,0,255), true)
+local function generateGridVectors()
+	local GridPoints = {
+		X_Axis = {},
+		Y_Axis = {},
+		Z_Axis = {},
+	}
 
-	local GridInd = Min + GridStep/2
 	local Col = Color(255,0,0)
-	local flipper = 0
-	while(GridInd.X <= Max.X) do
-		if(GridInd.X == 0) then
+	local TickLineIndex = 1
+	local CenterLineDrawn = false
+
+	for X = (Min.X + GridStep.X / 2), Max.X do
+		if(!CenterLineDrawn and X >= 0) then
 			Col = Color(255,255,255)
-		elseif(!flipper) then
+			CenterLineDrawn = true
+		elseif(TickLineIndex % 2 != 0) then
 			Col = Color(50,50,50)
 		else
 			Col = Color(255,0,0)
 		end
 
-		render.DrawLine(Vector(GridInd.X, Min.Y, Min.Z), Vector(GridInd.X,Max.Y,Min.Z), Col, true)
-		render.DrawLine(Vector(GridInd.X, Min.Y, Min.Z), Vector(GridInd.X,Min.Y,Max.Z), Col, true)
-
-		GridInd = Vector(GridInd.X + GridStep.X/2, Min.Y, Min.Z)
+		GridPoints.X_Axis[TickLineIndex] = {}
+		GridPoints.X_Axis[TickLineIndex].Start1 = Vector(X, Min.Y, Min.Z)
+		GridPoints.X_Axis[TickLineIndex].Start2 = Vector(X, Min.Y, Min.Z)
+		GridPoints.X_Axis[TickLineIndex].End1 = Vector(X,Max.Y,Min.Z)
+		GridPoints.X_Axis[TickLineIndex].End2 = Vector(X,Min.Y,Max.Z)
+		GridPoints.X_Axis[TickLineIndex].Color = Col
+		TickLineIndex = TickLineIndex + 1
 	end
 
-	GridInd = Min + GridStep/2
-	while(GridInd.Y<= Max.Y) do
-		if(GridInd.Y == 0) then
+	TickLineIndex = 1
+	CenterLineDrawn = false
+	for Y = (Min.Y + GridStep.Y / 2), Max.Y do
+		if(!CenterLineDrawn and Y >= 0) then
 			Col = Color(255,255,255)
-		elseif(GridInd.Y % GridStep.Y != 0) then
+			CenterLineDrawn = true
+		elseif(TickLineIndex % 2 != 0) then
 			Col = Color(50,50,50)
 		else
-			Col = Color(0,255,0)
+			Col = Color(255,0,0)
 		end
 
-		render.DrawLine(Vector(Min.Y, GridInd.Y, Min.Z), Vector(Max.Y, GridInd.Y, Min.Z), Col, true)
-		render.DrawLine(Vector(Min.Y, GridInd.Y, Min.Z), Vector(Min.Y, GridInd.Y, Max.Z), Col, true)
-
-		GridInd = Vector(Min.Y, GridInd.Y + GridStep.Y/2, Min.Z)
+		
+		GridPoints.Y_Axis[TickLineIndex] = {}
+		GridPoints.Y_Axis[TickLineIndex].Start1 = Vector(Min.Y, Y, Min.Z)
+		GridPoints.Y_Axis[TickLineIndex].Start2 = Vector(Min.Y, Y, Min.Z)
+		GridPoints.Y_Axis[TickLineIndex].End1 = Vector(Max.Y, Y, Min.Z)
+		GridPoints.Y_Axis[TickLineIndex].End2 = Vector(Min.Y, Y, Max.Z)
+		GridPoints.Y_Axis[TickLineIndex].Color = Col
+		TickLineIndex = TickLineIndex + 1
 	end
 
-	GridInd = Min + GridStep/2
-	while(GridInd.Z <= Max.Z) do
-		if(GridInd.Z == 0) then
+	TickLineIndex = 1
+	CenterLineDrawn = false
+	for Z = (Min.Z + GridStep.Z / 2), Max.Z do
+		if(!CenterLineDrawn and Z >= 0) then
 			Col = Color(255,255,255)
-		elseif(GridInd.Z % GridStep.Z != 0) then
+			CenterLineDrawn = true
+		elseif(TickLineIndex % 2 != 0) then
 			Col = Color(50,50,50)
 		else
-			Col = Color(0,0,255)
+			Col = Color(255,0,0)
 		end
 
-		render.DrawLine(Vector(Min.X, Min.Y, GridInd.Z), Vector(Max.X, Min.Y, GridInd.Z), Col, true)
-		render.DrawLine(Vector(Min.X, Min.Y, GridInd.Z), Vector(Min.X, Max.Y, GridInd.Z), Col, true)
-
-		GridInd = Vector(Min.X, Min.Y, GridInd.Z + GridStep.Z/2)
+		GridPoints.Z_Axis[TickLineIndex] = {}
+		GridPoints.Z_Axis[TickLineIndex].Start1 = Vector(Min.X, Min.Y, Z)
+		GridPoints.Z_Axis[TickLineIndex].Start2 = Vector(Min.X, Min.Y, Z)
+		GridPoints.Z_Axis[TickLineIndex].End1 = Vector(Max.X, Min.Y, Z)
+		GridPoints.Z_Axis[TickLineIndex].End2 = Vector(Min.X, Max.Y, Z)
+		GridPoints.Z_Axis[TickLineIndex].Color = Col
+		TickLineIndex = TickLineIndex + 1
 	end
+
+	return GridPoints
+end
+
+Grid = generateGridVectors()
+
+local function drawGrid()
+	local Min = GridMin
+	local Max = GridMax
+	render.DrawLine(Min, Vector(Max.X + GridStep.X,Min.Y,Min.Z), Color(255,0,0), true)
+	render.DrawLine(Min, Vector(Min.X,Max.Y + GridStep.Y,Min.Z), Color(0,255,0), true)
+	render.DrawLine(Min, Vector(Min.X,Min.Y,Max.Z + GridStep.Z), Color(0,0,255), true)
+
+	for _,Line in pairs(Grid.X_Axis) do
+		render.DrawLine(Line.Start1, Line.End1, Line.Color, true)
+		render.DrawLine(Line.Start2, Line.End2, Line.Color, true)
+	end
+
+	for _,Line in pairs(Grid.Y_Axis) do
+		render.DrawLine(Line.Start1, Line.End1, Line.Color, true)
+		render.DrawLine(Line.Start2, Line.End2, Line.Color, true)
+	end
+
+	for _,Line in pairs(Grid.Z_Axis) do
+		render.DrawLine(Line.Start1, Line.End1, Line.Color, true)
+		render.DrawLine(Line.Start2, Line.End2, Line.Color, true)
+	end
+
 end
 
 hook.Add("HUDPaint", "Progress Bar", function()
@@ -481,20 +528,15 @@ end)
 ---------------------------------------------------------------------------
 
 hook.Add("Think", "test", function()
-	--GridMin = Min
-	--GridMax = Max
 	if (!ValidEntity(ent) and ValidEntity(LocalPlayer():GetEyeTrace().Entity)) then
 		ent = LocalPlayer():GetEyeTrace().Entity
 		messege("Target Entity Selected.",MESSEGE_TYPE_NOTICE)
 	end
 end)
 concommand.Add("test2", function(ply, name, args)
-	--generateFunctionFromText(func)
-	p1 = -Vector(1.5,1.5,1.5)
-	p2 = Vector(1.5,1.5,1.5)
 	timer.Remove("MeshAnim")
 		zoom()
-		MeshBuildManager(100, 0, 3.14159*2)
+		MeshBuildManager()--100, 0, 3.14159*2)
 
 			timer.Create("MeshAnim", TimeStep, 0, function()
 		if(dir ) then
@@ -520,7 +562,7 @@ concommand.Add("test", function(ply, name, args)
 	p2 = Vector(1.5,1.5,1.5)
 	timer.Remove("MeshAnim")
 		zoom(p1,p2)
-		MeshBuildManager(100, 0, 3.14159*2)
+		MeshBuildManager()--100, 0, 3.14159*2)
 
 			timer.Create("MeshAnim", TimeStep, 0, function()
 		if(dir ) then
@@ -565,7 +607,7 @@ concommand.Add("graph", function(ply, name, args)
 		return false
 	end
 
-	MeshBuildManager(100, 0, 3.14159*2)
+	MeshBuildManager()--100, 0, 3.14159*2)
 
 	timer.Create("MeshAnim", TimeStep, 0, function()
 		if(dir ) then
