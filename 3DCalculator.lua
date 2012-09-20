@@ -208,7 +208,7 @@ local function checkFails(Range, ...)
 	local Flag = false
 
 	for i,v in pairs(verts) do
-		Flag = (v.Z < (GridMin.Z - VertexStep.Z*2) or v.Z > (GridMax.Z + VertexStep.Z*2))
+		Flag = (v.Z < (GridMin.Z - VertexStep.Z) or v.Z > (GridMax.Z + VertexStep.Z))
 
 		local dFlag
 		for _,l in pairs(verts) do
@@ -380,11 +380,11 @@ local function generateGridVectors()
 	local TickLineIndex = 1
 	local CenterLineDrawn = false
 
-	for X = (Min.X + GridStep.X / 2), Max.X do
+	for X = (Min.X), Max.X, GridStep.X / 2 do
 		if(!CenterLineDrawn and X >= 0) then
 			Col = Color(255,255,255)
 			CenterLineDrawn = true
-		elseif(TickLineIndex % 2 != 0) then
+		elseif(TickLineIndex % 2 == 0) then
 			Col = Color(50,50,50)
 		else
 			Col = Color(255,0,0)
@@ -401,14 +401,14 @@ local function generateGridVectors()
 
 	TickLineIndex = 1
 	CenterLineDrawn = false
-	for Y = (Min.Y + GridStep.Y / 2), Max.Y do
+	for Y = (Min.Y), Max.Y, GridStep.Y / 2 do
 		if(!CenterLineDrawn and Y >= 0) then
 			Col = Color(255,255,255)
 			CenterLineDrawn = true
-		elseif(TickLineIndex % 2 != 0) then
+		elseif(TickLineIndex % 2 == 0) then
 			Col = Color(50,50,50)
 		else
-			Col = Color(255,0,0)
+			Col = Color(0,255,0)
 		end
 
 		
@@ -423,14 +423,14 @@ local function generateGridVectors()
 
 	TickLineIndex = 1
 	CenterLineDrawn = false
-	for Z = (Min.Z + GridStep.Z / 2), Max.Z do
+	for Z = (Min.Z), Max.Z, GridStep.Z / 2 do
 		if(!CenterLineDrawn and Z >= 0) then
 			Col = Color(255,255,255)
 			CenterLineDrawn = true
-		elseif(TickLineIndex % 2 != 0) then
+		elseif(TickLineIndex % 2 == 0) then
 			Col = Color(50,50,50)
 		else
-			Col = Color(255,0,0)
+			Col = Color(0,0,255)
 		end
 
 		GridPoints.Z_Axis[TickLineIndex] = {}
@@ -536,6 +536,7 @@ end)
 concommand.Add("test2", function(ply, name, args)
 	timer.Remove("MeshAnim")
 		zoom()
+		generateGridVectors()
 		MeshBuildManager()--100, 0, 3.14159*2)
 
 			timer.Create("MeshAnim", TimeStep, 0, function()
@@ -558,11 +559,13 @@ concommand.Add("test2", function(ply, name, args)
 end)
 
 concommand.Add("test", function(ply, name, args)
-	p1 = -Vector(1.5,1.5,1.5)
-	p2 = Vector(1.5,1.5,1.5)
+	p1 = -Vector(1,1,1)
+	p2 = Vector(1,1,1)
 	timer.Remove("MeshAnim")
 		zoom(p1,p2)
+		generateGridVectors()
 		MeshBuildManager()--100, 0, 3.14159*2)
+		--generateGridVectors()
 
 			timer.Create("MeshAnim", TimeStep, 0, function()
 		if(dir ) then
