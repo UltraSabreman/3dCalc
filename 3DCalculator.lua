@@ -182,8 +182,8 @@ local function zoom(Pos1, Pos2)
 			messege("Compleatly Zoomed Out!", MESSEGE_TYPE_NOTICE)
 		end
 	else
-		Pos1 = Pos1 or Min
-		Pos2 = Pos2 or Min
+		--Pos1 = Pos1 or Min
+		--Pos2 = Pos2 or Min
 		ZoomStates[count + 1] = {
 			min = Min,
 			max = Max,
@@ -215,7 +215,7 @@ local function checkFails(Range, ...)
 		local dFlag
 		for _,l in pairs(verts) do
 			if(!dFlag) then
-				dFlag = (v:Distance(l) >= (Range/2))
+				dFlag = (v:Distance(l) >= (Range/1.5))
 			end
 		end
 
@@ -226,8 +226,11 @@ local function checkFails(Range, ...)
 end
 
 function buildMesh(Frames, tMin, tMax)	
+	print(tostring(Min).."|"..tostring(Max))
+	print(tostring(GridMin).."|"..tostring(GridMax))
 	local GridMin = Min
 	local GridMax = Max
+
 	tMin = tMin or 0
 	tMax = tMax or 0
 	Frames = Frames or 1
@@ -264,7 +267,7 @@ function buildMesh(Frames, tMin, tMax)
 					Highest = math.max(Highest, Z)
 				end
 
-				Points[tostring(Vector(X,Y))] = Vector(X/Ratio.X,Y/Ratio.Y,Z/Ratio.Z) 
+				Points[tostring(Vector(X,Y))] = Vector(X/Ratio.X, Y/Ratio.Y, Z/Ratio.Z) 
 			end
 		end
 		local CRange = math.abs(Lowest - Highest)
@@ -384,7 +387,7 @@ local function generateGridVectors()
 	local TickLineIndex = 1
 	local CenterLineDrawn = false
 
-	for X = (Min.X + GridStep.X / 2), Max.X, GridStep.X / 2 do
+	for X = (Min.X), Max.X, GridStep.X / 2 do
 		if(!CenterLineDrawn and X >= 0) then
 			Col = Color(255,255,255)
 			CenterLineDrawn = true
@@ -405,7 +408,7 @@ local function generateGridVectors()
 
 	TickLineIndex = 1
 	CenterLineDrawn = false
-	for Y = (Min.Y + GridStep.Y / 2), Max.Y, GridStep.Y / 2 do
+	for Y = (Min.Y), Max.Y, GridStep.Y / 2 do
 		if(!CenterLineDrawn and Y >= 0) then
 			Col = Color(255,255,255)
 			CenterLineDrawn = true
@@ -427,7 +430,7 @@ local function generateGridVectors()
 
 	TickLineIndex = 1
 	CenterLineDrawn = false
-	for Z = (Min.Z + GridStep.Z / 2), Max.Z, GridStep.Z / 2 do
+	for Z = (Min.Z), Max.Z, GridStep.Z / 2 do
 		if(!CenterLineDrawn and Z >= 0) then
 			Col = Color(255,255,255)
 			CenterLineDrawn = true
@@ -544,7 +547,7 @@ concommand.Add("zoomout", function(ply, name, args)
 end)
 
 concommand.Add("zoomin", function(ply, name, args)
-	zoom(Vector(1,1,1),-Vector(1,1,1))
+	zoom(-Vector(1, 1, 1), Vector(1,1,1))
 	Grid = 	generateGridVectors()
 	MeshBuildManager()	
 end)
@@ -564,8 +567,6 @@ concommand.Add("graph", function(ply, name, args)
 
 	messege("Computing points and building mesh, possible small freeze.", MESSEGE_TYPE_WARNING)
 	timer.Remove("MeshAnim")
-	
-	Print = false		
 
 	if(!generateFunctionFromText(func)) then 
 		messege("Something is wrong with your funciton! Make sure you have the correct syntax.", MESSEGE_TYPE_ERROR)
