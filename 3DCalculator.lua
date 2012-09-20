@@ -10,7 +10,7 @@ local Ratio = Vector(1,1,1) --todo
 local TimeStep = 0.05
 local AxisColoring = false 
 local RenderMode = "solid+wire" --"wire","solid","solid+wire",
-
+local dir = true
 
 --[[ WHAT TO-DO:
 [\] 1) Fix Zooming : Fix axis scaling when zooming (prob re-write code to start at 0,0 and draw out)
@@ -140,8 +140,8 @@ local function messege(msg, msgType)
 end
 
 local function DrawZoomPoints(Pos1, Pos2)
-	local Pos1 = Pos1 or Min
-	local Pos2 = Pos2 or Min
+	local Pos1 = Pos1 or GridMin
+	local Pos2 = Pos2 or GridMin
 
 	local col = Color(255,127,0)
 
@@ -170,14 +170,16 @@ end
 local function zoom(Pos1, Pos2)
 	local count = #ZoomStates
 	if(!Pos1 and !Pos2) then 
-		Min = ZoomStates[count].min
-		Max = ZoomStates[count].max
-		VertexStep = ZoomStates[count].step
-		GridStep = ZoomStates[count].gridstep
-		Ratio = ZoomStates[count].ratio
-
 		if(count != 1) then
+			Min = ZoomStates[count].min
+			Max = ZoomStates[count].max
+			VertexStep = ZoomStates[count].step
+			GridStep = ZoomStates[count].gridstep
+			Ratio = ZoomStates[count].ratio
+
 			ZoomStates[count] = nil
+		else
+			messege("Compleatly Zoomed Out!", MESSEGE_TYPE_NOTICE)
 		end
 	else
 		Pos1 = Pos1 or Min
@@ -208,7 +210,7 @@ local function checkFails(Range, ...)
 	local Flag = false
 
 	for i,v in pairs(verts) do
-		Flag = (v.Z < (GridMin.Z - VertexStep.Z) or v.Z > (GridMax.Z + VertexStep.Z))
+		Flag = (v.Z < (Min.Z - VertexStep.Z) or v.Z > (Max.Z + VertexStep.Z))
 
 		local dFlag
 		for _,l in pairs(verts) do
@@ -223,7 +225,9 @@ local function checkFails(Range, ...)
 	return Flag
 end
 
-function buildMesh(Frames, tMin, tMax)
+function buildMesh(Frames, tMin, tMax)	
+	local GridMin = Min
+	local GridMax = Max
 	tMin = tMin or 0
 	tMax = tMax or 0
 	Frames = Frames or 1
@@ -325,8 +329,7 @@ function buildMesh(Frames, tMin, tMax)
 		Meshes[MeshId]:BuildFromTriangles(meshData)
 		Meshes["Compleated "..MeshId] = true
 	end
-	print("Done in: "..(SysTime() - StartTime))
-	messege("Done Generating, took: "..math.Round(SysTime() - StartTime).."s", MESSEGE_TYPE_SUCCESS)
+	messege("Done Generating, took: "..string.format("%.2f",(SysTime() - StartTime)).."s", MESSEGE_TYPE_SUCCESS)
 end
 
 local function getCompleatedMeshes()
@@ -366,10 +369,11 @@ local function MeshBuildManager(a,b,c)
 		end
 
 	end)
-
 end
 
 local function generateGridVectors()
+	local Min = GridMin
+	local Max = GridMax
 	local GridPoints = {
 		X_Axis = {},
 		Y_Axis = {},
@@ -380,11 +384,11 @@ local function generateGridVectors()
 	local TickLineIndex = 1
 	local CenterLineDrawn = false
 
-	for X = (Min.X), Max.X, GridStep.X / 2 do
+	for X = (Min.X + GridStep.X / 2), Max.X, GridStep.X / 2 do
 		if(!CenterLineDrawn and X >= 0) then
 			Col = Color(255,255,255)
 			CenterLineDrawn = true
-		elseif(TickLineIndex % 2 == 0) then
+		elseif(TickLineIndex % 2 != 0) then
 			Col = Color(50,50,50)
 		else
 			Col = Color(255,0,0)
@@ -401,11 +405,11 @@ local function generateGridVectors()
 
 	TickLineIndex = 1
 	CenterLineDrawn = false
-	for Y = (Min.Y), Max.Y, GridStep.Y / 2 do
+	for Y = (Min.Y + GridStep.Y / 2), Max.Y, GridStep.Y / 2 do
 		if(!CenterLineDrawn and Y >= 0) then
 			Col = Color(255,255,255)
 			CenterLineDrawn = true
-		elseif(TickLineIndex % 2 == 0) then
+		elseif(TickLineIndex % 2 != 0) then
 			Col = Color(50,50,50)
 		else
 			Col = Color(0,255,0)
@@ -423,11 +427,11 @@ local function generateGridVectors()
 
 	TickLineIndex = 1
 	CenterLineDrawn = false
-	for Z = (Min.Z), Max.Z, GridStep.Z / 2 do
+	for Z = (Min.Z + GridStep.Z / 2), Max.Z, GridStep.Z / 2 do
 		if(!CenterLineDrawn and Z >= 0) then
 			Col = Color(255,255,255)
 			CenterLineDrawn = true
-		elseif(TickLineIndex % 2 == 0) then
+		elseif(TickLineIndex % 2 != 0) then
 			Col = Color(50,50,50)
 		else
 			Col = Color(0,0,255)
@@ -442,6 +446,7 @@ local function generateGridVectors()
 		TickLineIndex = TickLineIndex + 1
 	end
 
+	
 	return GridPoints
 end
 
@@ -468,7 +473,6 @@ local function drawGrid()
 		render.DrawLine(Line.Start1, Line.End1, Line.Color, true)
 		render.DrawLine(Line.Start2, Line.End2, Line.Color, true)
 	end
-
 end
 
 hook.Add("HUDPaint", "Progress Bar", function()
@@ -533,56 +537,16 @@ hook.Add("Think", "test", function()
 		messege("Target Entity Selected.",MESSEGE_TYPE_NOTICE)
 	end
 end)
-concommand.Add("test2", function(ply, name, args)
-	timer.Remove("MeshAnim")
-		zoom()
-		generateGridVectors()
-		MeshBuildManager()--100, 0, 3.14159*2)
-
-			timer.Create("MeshAnim", TimeStep, 0, function()
-		if(dir ) then
-			if(MeshIndex < NumMeshes) then
-				MeshIndex = MeshIndex + 1
-			else
-				dir = false
-			end
-		else
-			if(MeshIndex > 1) then
-				MeshIndex = MeshIndex - 1
-			else
-				dir = true
-			end
-		end
-			
-	end)
-
+concommand.Add("zoomout", function(ply, name, args)
+	zoom()
+	Grid = generateGridVectors()
+	MeshBuildManager()
 end)
 
-concommand.Add("test", function(ply, name, args)
-	p1 = -Vector(1,1,1)
-	p2 = Vector(1,1,1)
-	timer.Remove("MeshAnim")
-		zoom(p1,p2)
-		generateGridVectors()
-		MeshBuildManager()--100, 0, 3.14159*2)
-		--generateGridVectors()
-
-			timer.Create("MeshAnim", TimeStep, 0, function()
-		if(dir ) then
-			if(MeshIndex < NumMeshes) then
-				MeshIndex = MeshIndex + 1
-			else
-				dir = false
-			end
-		else
-			if(MeshIndex > 1) then
-				MeshIndex = MeshIndex - 1
-			else
-				dir = true
-			end
-		end
-			
-	end)
+concommand.Add("zoomin", function(ply, name, args)
+	zoom(Vector(1,1,1),-Vector(1,1,1))
+	Grid = 	generateGridVectors()
+	MeshBuildManager()	
 end)
 
 concommand.Add("stopgen", function()
@@ -591,8 +555,6 @@ concommand.Add("stopgen", function()
 		messege("Mesh generation aborted! What was made up to now will draw.",  MESSEGE_TYPE_FAIL)
 	end
 end)
-
-local dir = true
 
 concommand.Add("graph", function(ply, name, args)
 
