@@ -1,14 +1,19 @@
-This is a fully featured (or at least will be lol) 3d graphing calculator in gmod.
+This is a fully featured (or at least will be lol) 3d graphing calculator in 
+gmod.
 
 Features:
 
-1) Zoomability (broken atm while I re-write and mess with the scaling system for the axis)
+1) Zoomability (broken atm while I re-write and mess with the scaling system
+for the axis)
 2) Animations, you will be able to specify frames and interval to animate.
 3) Different rendering/coloring modes
 4) Wont lock up your game when rendering :p
 
+
 How to use:
+
 Atm all you can really do is use the concommand "graph" followed by an 
-equation you want to graph (as I have yet to add more commands for zooming as such).
+equation you want to graph (as I have yet to add more commands for zooming as
+such).
 
 Example: graph cos(x) * sin(1/y)
