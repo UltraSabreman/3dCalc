@@ -22,7 +22,7 @@ Optional:
 [X] 5) Figure out how to get rid of the tangent lines....
 ]]
 
-
+ 
 local SmallHudFont = {
 	font = "Times New Roman",
 	size = 15,
@@ -39,6 +39,7 @@ local SmallHudFont = {
 	additive = true,
 	outline = false,
 }
+
 surface.CreateFont("Test", SmallHudFont)
 local Percent = 0
 local buildRoutine = nil
@@ -506,7 +507,7 @@ hook.Add("HUDPaint", "Progress Bar", function()
 end)
 
 hook.Add("PostDrawOpaqueRenderables", "MeshTest", function()
-	if(ValidEntity(ent)) then
+	if(IsValid(ent)) then
 		DrawMatrix:SetAngles(ent:GetAngles())
 		DrawMatrix:SetTranslation(ent:GetPos())
 		DrawMatrix:Scale(Vector(1,1,1) * 3)
@@ -535,7 +536,7 @@ end)
 ---------------------------------------------------------------------------
 
 hook.Add("Think", "test", function()
-	if (!ValidEntity(ent) and ValidEntity(LocalPlayer():GetEyeTrace().Entity)) then
+	if (!IsValid(ent) and IsValid(LocalPlayer():GetEyeTrace().Entity)) then
 		ent = LocalPlayer():GetEyeTrace().Entity
 		messege("Target Entity Selected.",MESSEGE_TYPE_NOTICE)
 	end
