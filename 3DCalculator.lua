@@ -9,11 +9,11 @@ local GridMax = Max
 local Ratio = Vector(1,1,1) --todo
 local TimeStep = 0.05
 local AxisColoring = false 
-local RenderMode = "solid+wire" --"wire","solid","solid+wire",
+local RenderMode = "wire" --"wire","solid","solid+wire",
 local dir = true
 
 --[[ WHAT TO-DO:
-[\] 1) Fix Zooming : Fix axis scaling when zooming (prob re-write code to start at 0,0 and draw out)
+[X] 1) Fix Zooming : Fix axis scaling when zooming (prob re-write code to start at 0,0 and draw out) [FUCK YEA CUNTS]
 [ ] 2) Orginize
 [ ] 3) Optimize
 [ ] 4) Ui-anize
@@ -24,23 +24,41 @@ Optional:
 
  
 local SmallHudFont = {
-	font = "Times New Roman",
-	size = 15,
-	weight = 100,
-	blursize = 0,
-	scanlines = 0,
-	antialias = true,
-	underline = false,
-	italic = false,
-	strikeout = false,
-	symbol = false,
-	rotary = false,
-	shadow = false,
-	additive = true,
-	outline = false,
+    font = "Times New Roman",
+    size = 15,
+    weight = 100,
+    blursize = 0,
+    scanlines = 0,
+    antialias = true,
+    underline = false,
+    italic = false,
+    strikeout = false,
+    symbol = false,
+    rotary = false,
+    shadow = false,
+    additive = true,
+    outline = false,
 }
-
+local shit = {
+    font = "Times New Roman",
+    size = 15,
+    weight = 100,
+    blursize = 0,
+    scanlines = 0,
+    antialias = false,
+    underline = false,
+    italic = false,
+    strikeout = false,
+    symbol = false,
+    rotary = false,
+    shadow = false,
+    additive = false,
+    outline = true,
+}
 surface.CreateFont("Test", SmallHudFont)
+surface.CreateFont("Test2", shit)
+
+
 local Percent = 0
 local buildRoutine = nil
 local Building = false
@@ -53,12 +71,12 @@ local DrawMatrix = Matrix()
 local Meshes = {}
 local Grid = {}
 local ZoomStates = {
-	{
-		min = Min,
-		max = Max,
-		step = VertexStep,
-		gridstep = GridStep,
-	}
+    {
+        min = Min,
+        max = Max,
+        step = VertexStep,
+        gridstep = GridStep,
+    }
 }
 
 local MESSEGE_TYPE_NORMAL = 0
@@ -69,527 +87,622 @@ local MESSEGE_TYPE_SUCCESS = 4
 local MESSEGE_TYPE_FAIL = 5
 
 local SolidMat = CreateMaterial("SolidFill4", "UnlitGeneric", { --VertexLitGeneric
-	["$basetexture"]		= "models/debug/debugwhite",
-	["$reflectivity"] 		= "[0 0 0]",
-	["$vertexcolor"] 		= 1,
-	["$color"]				= "[0.5 0.5 0.5]",
-	["$nocull"]				= 1,
+    ["$basetexture"]        = "models/debug/debugwhite",
+    ["$reflectivity"]       = "[0 0 0]",
+    ["$vertexcolor"]        = 1,
+    ["$color"]              = "[0.5 0.5 0.5]",
+    ["$nocull"]             = 1,
 })
 
 local WireHighlight = CreateMaterial("WireHighLight2", "Wireframe", {
-	["$basetexture"]		= "editor/wireframe",
-	["$vertexcolor"] 		= 0,
-	["$color"]				= "[ 0 0 0 ]",
-	--["$ignorez"]			= 1,
-	["$nocull"]				= 1,
+    ["$basetexture"]        = "editor/wireframe",
+    ["$vertexcolor"]        = 0,
+    ["$color"]              = "[ 0 0 0 ]",
+    --["$ignorez"]          = 1,
+    ["$nocull"]             = 1,
 })
 
 local WireMat = CreateMaterial("WireFill", "Wireframe", {
-	["$basetexture"]		= "editor/wireframe",
-	["$vertexcolor"] 		= 1,
-	["$nocull"]				= 1,
+    ["$basetexture"]        = "editor/wireframe",
+    ["$vertexcolor"]        = 1,
+    ["$nocull"]             = 1,
 })
 
 local badArgs = {
-	"return", "local", "function", "if", "and", 
-	"then", "do", "or", "nil", "false", "true",
-	"while", "break", "for", "end", "%{", "%}",
-	"%[", "%]"
+    "return", "local", "function", "if", "and", 
+    "then", "do", "or", "nil", "false", "true",
+    "while", "break", "for", "end", "%{", "%}",
+    "%[", "%]"
 }
 
 ---------------------------------------------------------------------------
 
 local function generateFunctionFromText(infunc)
-	if(!infunc or infunc == "") then chat.AddText(Color(255,0,0), "ERROR", Color(255,255,255), ": You need to give it a function to graph!") return false end
+    if(!infunc or infunc == "") then chat.AddText(Color(255,0,0), "ERROR", Color(255,255,255), ": You need to give it a function to graph!") return false end
 
-	local tempfunc = string.lower(infunc)
+    local tempfunc = string.lower(infunc)
 
-	for i,v in pairs(badArgs) do
-		local pos = string.find(tempfunc, v)
-		if(pos) then
-			messege("Illigal Lua keyword '"..v.."' detected at position: "..pos, MESSEGE_TYPE_ERROR)
-			return false
-		end
-	end
+    for i,v in pairs(badArgs) do
+        local pos = string.find(tempfunc, v)
+        if(pos) then
+            messege("Illigal Lua keyword '"..v.."' detected at position: "..pos, MESSEGE_TYPE_ERROR)
+            return false
+        end
+    end
 
-	local newfunction = CompileString("function getZ(x,y,t) return ("..tempfunc..") end setfenv(getZ, math)", "Z(X,Y,T) = "..infunc, false)
-	if(type(newfunction) == "string") then
-		messege(newfunction,MESSEGE_TYPE_ERROR)
-		return false
-	else
-		newfunction()
-		return true
-	end
+    local newfunction = CompileString("function getZ(x,y,t) return ("..tempfunc..") end setfenv(getZ, math)", "Z(X,Y,T) = "..infunc, false)
+    if(type(newfunction) == "string") then
+        messege(newfunction,MESSEGE_TYPE_ERROR)
+        return false
+    else
+        newfunction()
+        return true
+    end
 end
 
 local function messege(msg, msgType)
-	if(msgType == MESSEGE_TYPE_NOTICE) then
-		chat.AddText(Color(150,150,150), "[NOTICE]", Color(255,255,255), ": "..msg)
-	elseif(msgType == MESSEGE_TYPE_ERROR) then
-		chat.AddText(Color(255,0,0), "[ERROR]", Color(255,255,255), ": "..msg)
-	elseif(msgType == MESSEGE_TYPE_WARNING) then
-		chat.AddText(Color(255,150,0), "[WARNING]", Color(255,255,255), ": "..msg)
-	elseif(msgType == MESSEGE_TYPE_NORMAL) then
-		chat.AddText(Color(255,255,255), msg)
-	elseif(msgType == MESSEGE_TYPE_SUCCESS) then
-		chat.AddText(Color(0,255,0), "[SUCCESS]", Color(255,255,255), ": "..msg)
-	elseif(msgType == MESSEGE_TYPE_FAIL) then
-		chat.AddText(Color(255,0,0), "[FAIL]", Color(255,255,255), ": "..msg)
-	else
-		chat.AddText(Color(255,255,255),msg)
-	end
+    if(msgType == MESSEGE_TYPE_NOTICE) then
+        chat.AddText(Color(150,150,150), "[NOTICE]", Color(255,255,255), ": "..msg)
+    elseif(msgType == MESSEGE_TYPE_ERROR) then
+        chat.AddText(Color(255,0,0), "[ERROR]", Color(255,255,255), ": "..msg)
+    elseif(msgType == MESSEGE_TYPE_WARNING) then
+        chat.AddText(Color(255,150,0), "[WARNING]", Color(255,255,255), ": "..msg)
+    elseif(msgType == MESSEGE_TYPE_NORMAL) then
+        chat.AddText(Color(255,255,255), msg)
+    elseif(msgType == MESSEGE_TYPE_SUCCESS) then
+        chat.AddText(Color(0,255,0), "[SUCCESS]", Color(255,255,255), ": "..msg)
+    elseif(msgType == MESSEGE_TYPE_FAIL) then
+        chat.AddText(Color(255,0,0), "[FAIL]", Color(255,255,255), ": "..msg)
+    else
+        chat.AddText(Color(255,255,255),msg)
+    end
 end
 
 local function DrawZoomPoints(Pos1, Pos2)
-	local Pos1 = Pos1 or GridMin
-	local Pos2 = Pos2 or GridMin
+    local Pos1 = Pos1 or Min
+    local Pos2 = Pos2 or Min
 
-	local col = Color(255,127,0)
+    local col = Color(255,127,0)
 
-	render.DrawWireframeSphere(Pos1, 0.1, 4, 4, Color(0,255,0), true)
-	render.DrawWireframeSphere(Pos2, 0.1, 4, 4, Color(255,0,0), true)
+    render.DrawWireframeSphere(Pos1, 0.1, 4, 4, Color(0,255,0), true)
+    render.DrawWireframeSphere(Pos2, 0.1, 4, 4, Color(255,0,0), true)
 
-	--face 1
-	render.DrawLine(Vector(Pos1.X, Pos1.Y, Pos1.Z), Vector(Pos1.X, Pos2.Y, Pos1.Z), col, true)
-	render.DrawLine(Vector(Pos1.X, Pos2.Y, Pos1.Z), Vector(Pos1.X, Pos2.Y, Pos2.Z), col, true)
-	render.DrawLine(Vector(Pos1.X, Pos2.Y, Pos2.Z), Vector(Pos1.X, Pos1.Y, Pos2.Z), col, true)
-	render.DrawLine(Vector(Pos1.X, Pos1.Y, Pos2.Z), Vector(Pos1.X, Pos1.Y, Pos1.Z), col, true)
+    --face 1
+    render.DrawLine(Vector(Pos1.X, Pos1.Y, Pos1.Z), Vector(Pos1.X, Pos2.Y, Pos1.Z), col, true)
+    render.DrawLine(Vector(Pos1.X, Pos2.Y, Pos1.Z), Vector(Pos1.X, Pos2.Y, Pos2.Z), col, true)
+    render.DrawLine(Vector(Pos1.X, Pos2.Y, Pos2.Z), Vector(Pos1.X, Pos1.Y, Pos2.Z), col, true)
+    render.DrawLine(Vector(Pos1.X, Pos1.Y, Pos2.Z), Vector(Pos1.X, Pos1.Y, Pos1.Z), col, true)
 
-	--face 2
-	render.DrawLine(Vector(Pos2.X, Pos2.Y, Pos2.Z), Vector(Pos2.X, Pos1.Y, Pos2.Z), col, true)
-	render.DrawLine(Vector(Pos2.X, Pos1.Y, Pos2.Z), Vector(Pos2.X, Pos1.Y, Pos1.Z), col, true)
-	render.DrawLine(Vector(Pos2.X, Pos1.Y, Pos1.Z), Vector(Pos2.X, Pos2.Y, Pos1.Z), col, true)
-	render.DrawLine(Vector(Pos2.X, Pos2.Y, Pos1.Z), Vector(Pos2.X, Pos2.Y, Pos2.Z), col, true)
+    --face 2
+    render.DrawLine(Vector(Pos2.X, Pos2.Y, Pos2.Z), Vector(Pos2.X, Pos1.Y, Pos2.Z), col, true)
+    render.DrawLine(Vector(Pos2.X, Pos1.Y, Pos2.Z), Vector(Pos2.X, Pos1.Y, Pos1.Z), col, true)
+    render.DrawLine(Vector(Pos2.X, Pos1.Y, Pos1.Z), Vector(Pos2.X, Pos2.Y, Pos1.Z), col, true)
+    render.DrawLine(Vector(Pos2.X, Pos2.Y, Pos1.Z), Vector(Pos2.X, Pos2.Y, Pos2.Z), col, true)
 
-	--Conectors
-	render.DrawLine(Vector(Pos1.X, Pos1.Y, Pos1.Z), Vector(Pos2.X, Pos1.Y, Pos1.Z), col, true)
-	render.DrawLine(Vector(Pos1.X, Pos2.Y, Pos1.Z), Vector(Pos2.X, Pos2.Y, Pos1.Z), col, true)
-	render.DrawLine(Vector(Pos1.X, Pos1.Y, Pos2.Z), Vector(Pos2.X, Pos1.Y, Pos2.Z), col, true)
-	render.DrawLine(Vector(Pos1.X, Pos2.Y, Pos2.Z), Vector(Pos2.X, Pos2.Y, Pos2.Z), col, true)
+    --Conectors
+    render.DrawLine(Vector(Pos1.X, Pos1.Y, Pos1.Z), Vector(Pos2.X, Pos1.Y, Pos1.Z), col, true)
+    render.DrawLine(Vector(Pos1.X, Pos2.Y, Pos1.Z), Vector(Pos2.X, Pos2.Y, Pos1.Z), col, true)
+    render.DrawLine(Vector(Pos1.X, Pos1.Y, Pos2.Z), Vector(Pos2.X, Pos1.Y, Pos2.Z), col, true)
+    render.DrawLine(Vector(Pos1.X, Pos2.Y, Pos2.Z), Vector(Pos2.X, Pos2.Y, Pos2.Z), col, true)
 end
+
+--local off1 = Vector()
+--local off2 = Vector()
 
 local function zoom(Pos1, Pos2)
-	local count = #ZoomStates
-	if(!Pos1 and !Pos2) then 
-		if(count != 1) then
-			Min = ZoomStates[count].min
-			Max = ZoomStates[count].max
-			VertexStep = ZoomStates[count].step
-			GridStep = ZoomStates[count].gridstep
-			Ratio = ZoomStates[count].ratio
+    local count = #ZoomStates
 
-			ZoomStates[count] = nil
-		else
-			messege("Compleatly Zoomed Out!", MESSEGE_TYPE_NOTICE)
-		end
-	else
-		--Pos1 = Pos1 or Min
-		--Pos2 = Pos2 or Min
-		ZoomStates[count + 1] = {
-			min = Min,
-			max = Max,
-			step = VertexStep,
-			gridstep = GridStep,
-			ratio = Ratio
-		}
+    if(!Pos1 and !Pos2) then 
+        if(count != 1) then
+            Min = ZoomStates[count].min
+            Max = ZoomStates[count].max
+            VertexStep = ZoomStates[count].step
+            GridStep = ZoomStates[count].gridstep
+            Ratio = ZoomStates[count].ratio
 
-		local V1 = Vector(math.abs(Max.X), math.abs(Max.Y), math.abs(Max.Z)) + Vector(math.abs(Min.X), math.abs(Min.Y), math.abs(Min.Z)) 
-		local V2 = Vector(math.abs(Pos1.X), math.abs(Pos1.Y), math.abs(Pos1.Z)) + Vector(math.abs(Pos2.X), math.abs(Pos2.Y), math.abs(Pos2.Z))
-		Ratio = Vector(V2.X / V1.X, V2.Y / V1.Y, V2.Z / V1.Z)
+            ZoomStates[count] = nil
+        else
+            messege("Compleatly Zoomed Out!", MESSEGE_TYPE_NOTICE)
+        end
+    else
+        ZoomStates[count + 1] = {
+            min = Min,
+            max = Max,
+            step = VertexStep,
+            gridstep = GridStep,
+            ratio = Ratio
+        }
 
-		Min = Pos1
-		Max = Pos2
+        local abs = math.abs
+        local V1 = Max + Vector(abs(Min.X), abs(Min.Y), abs(Min.Z)) --get orig volume
 
-		VertexStep = VertexStep * Ratio
-		GridStep = Vector(GridStep.X / Ratio.X, GridStep.Y / Ratio.Y, GridStep.Z / Ratio.Z)
-	end
-	--MeshBuildManager() --todo
+        --make sure pos 1 constains smallest components (can't make an inverted graph can we?)
+        if(Pos2.X < Pos1.X) then
+            local x = Pos2.X
+            Pos2.X = Pos1.X
+            Pos1.X = x
+        end
+        if(Pos2.Y < Pos1.Y) then
+            local y = Pos2.Y
+            Pos2.Y = Pos1.Y
+            Pos1.Y = y
+        end
+        if(Pos2.Z < Pos1.Z) then
+            local z = Pos2.Z
+            Pos2.Z = Pos1.Z
+            Pos1.Z = z
+        end
+
+        local V2 = Pos2 + Vector(abs(Pos1.X), abs(Pos1.Y), abs(Pos1.Z))
+        Ratio = Vector(V2.X / V1.X, V2.Y / V1.Y, V2.Z / V1.Z)
+
+        print("----------------------")
+        print("Min|Max: "..tostring(Min).."|"..tostring(Max))
+        print("Pos1|Pos2: "..tostring(Pos1).."|"..tostring(Pos2))
+        print("Ratio: "..tostring(Ratio))
+        print("Old VertexStep: "..tostring(VertexStep))
+        print("Old GridStep: "..tostring(GridStep))
+
+        --off1 = (Pos1 - Min)
+        --off2 = (Pos2 - Max)
+        Min = Pos1
+        Max = Pos2
+
+        VertexStep = VertexStep * Ratio
+        --GridStep = Vector(GridStep.X / Ratio.X, GridStep.Y / Ratio.Y, GridStep.Z / Ratio.Z)
+        print("New VertexStep: "..tostring(VertexStep))
+        print("New GridStep: "..tostring(GridStep))
+        print("----------------------")
+
+
+    end
+    --MeshBuildManager() --todo
 end
-		
+        
 local function checkFails(Range, ...)
-	local verts = {...}
-	local Flag = false
+    local verts = {...}
+    local Flag = false
 
-	for i,v in pairs(verts) do
-		Flag = (v.Z < (Min.Z - VertexStep.Z) or v.Z > (Max.Z + VertexStep.Z))
+    for i,v in pairs(verts) do
+        --Flag = (v.Z < (GridMin.Z) or v.Z > (GridMax.Z)) --todo
 
-		local dFlag
-		for _,l in pairs(verts) do
-			if(!dFlag) then
-				dFlag = (v:Distance(l) >= (Range/1.5))
-			end
-		end
+        local dFlag
+        for _,l in pairs(verts) do
+            if(!dFlag) then
+                dFlag = (v:Distance(l) >= (Range/1.5))
+            end
+        end
 
-		if(!Flag) then Flag = dFlag end
-	end
-	
-	return Flag
+        --if(!Flag) then Flag = dFlag end
+    end
+    
+    return Flag
 end
 
-function buildMesh(Frames, tMin, tMax)	
-	print(tostring(Min).."|"..tostring(Max))
-	print(tostring(GridMin).."|"..tostring(GridMax))
-	local GridMin = Min
-	local GridMax = Max
+function buildMesh(Frames, tMin, tMax)  
+    tMin = tMin or 0
+    tMax = tMax or 0
+    Frames = Frames or 1
 
-	tMin = tMin or 0
-	tMax = tMax or 0
-	Frames = Frames or 1
+    local StartTime = SysTime()
+    local TRange = (math.abs(tMin) + math.abs(tMax)) or 1
+    local GRange = math.abs(Min.Z - Max.Z)
+    
+    for i = 1, Frames do
+        if(Meshes[i]) then
+            Meshes[i]:Destroy()
+        end
+        Meshes["Compleated "..i] = false
+        Meshes[i] = Mesh()
+    end
 
-	local StartTime = SysTime()
-	local TRange = (math.abs(tMin) + math.abs(tMax)) or 1
-	local GRange = math.abs(GridMin.Z - GridMax.Z)
-	
-	for i = 1, Frames do
-		if(Meshes[i]) then
-			Meshes[i]:Destroy()
-		end
-		Meshes["Compleated "..i] = false
-		Meshes[i] = Mesh()
-	end
+    for MeshId = 1, Frames do
+        local meshData = {}
+        local Points = {}
 
-	for MeshId = 1, Frames do
-		local meshData = {}
-		local Points = {}
+        local Lowest = Max.Z
+        local Highest = Min.Z
+        if(AxisColoring) then
+            Lowest = Min.Z
+            Highest = Max.Z
+        end 
 
-		local Lowest = GridMax.Z
-		local Highest = GridMin.Z
-		if(AxisColoring) then
-			Lowest = GridMin.Z
-			Highest = GridMax.Z
-		end	
+        for X = Min.X, Max.X, (VertexStep.X) do
+            for Y = Min.Y, Max.Y, (VertexStep.Y) do
+                local Z = math.Clamp(getZ(X,Y, (MeshId/Frames)*TRange + tMin ), Min.Z, Max.Z) --todo
 
-		for X = Min.X, Max.X, (VertexStep.X) do
-			for Y = Min.Y, Max.Y, (VertexStep.Y) do
-				local Z = math.Clamp(getZ(X,Y, (MeshId/Frames)*TRange + tMin ), GridMin.Z - VertexStep.Z, GridMax.Z + VertexStep.Z) --todo
+                if(!AxisColoring) then
+                    Lowest = math.min(Lowest, Z)
+                    Highest = math.max(Highest, Z)
+                end
 
-				if(!AxisColoring) then
-					Lowest = math.min(Lowest, Z)
-					Highest = math.max(Highest, Z)
-				end
+                Points[tostring(Vector(X,Y))] = Vector(X, Y, Z)-- + off1 - off2
+            end
+        end
+        local CRange = math.abs(Lowest - Highest)
+        local hsv = HSVToColor
 
-				Points[tostring(Vector(X,Y))] = Vector(X/Ratio.X, Y/Ratio.Y, Z/Ratio.Z) 
-			end
-		end
-		local CRange = math.abs(Lowest - Highest)
-		local hsv = HSVToColor
+        local hsv2rgb = function(h)
+            return hsv((math.abs(h - Lowest)/CRange) * 180 - 45, 1, 1)
 
-		local hsv2rgb = function(h)
-			return hsv((math.abs(h - Lowest)/CRange) * 180 - 45, 1, 1)
+        end
+    
+    
+        local RoutineIndex = 0
 
-		end
-	
-	
-		local RoutineIndex = 0
+        for X = Min.X, Max.X, VertexStep.X do
+            for Y = Min.Y, Max.Y, VertexStep.Y do
 
-		for X = Min.X, Max.X, VertexStep.X do
-			for Y = Min.Y, Max.Y, VertexStep.Y do
+                local verts = {
+                    Points[tostring(Vector(X, Y))],
+                    Points[tostring(Vector(X, Y + VertexStep.Y))],
+                    Points[tostring(Vector(X + VertexStep.X, Y + VertexStep.Y))],
+                    Points[tostring(Vector(X + VertexStep.X, Y))],
+                }
 
-				local verts = {
-					Points[tostring(Vector(X, Y))],
-					Points[tostring(Vector(X, Y + VertexStep.Y))],
-					Points[tostring(Vector(X + VertexStep.X, Y + VertexStep.Y))],
-					Points[tostring(Vector(X + VertexStep.X, Y))],
-				}
-
-				if(verts[1] and verts[2] and verts[3] and verts[4]) then 
-					if(!checkFails(GRange, verts[1], verts[2], verts[3])) then
-						meshData[#meshData + 1] = {
-							pos = verts[1],
-							color = hsv2rgb(verts[1].Z),
-						}
-						meshData[#meshData + 1] = {
-							pos = verts[2],
-							color = hsv2rgb(verts[2].Z),
-						}
-						meshData[#meshData + 1] = {
-							pos = verts[3],
-							color = hsv2rgb(verts[3].Z),
-						}
-					end
-					
-					if(!checkFails(GRange, verts[3], verts[4], verts[1])) then
-						meshData[#meshData + 1] = {
-							pos = verts[3],
-							color = hsv2rgb(verts[3].Z),
-						}						
-						meshData[#meshData + 1] = {
-							pos = verts[4],
-							color = hsv2rgb(verts[4].Z),
-						}
-						meshData[#meshData + 1] = {
-							pos = verts[1],
-							color = hsv2rgb(verts[1].Z),
-						}
-					end
-				end
-			end
-			RoutineIndex = RoutineIndex + 1
-			if(RoutineIndex % 10 == 0) then
-				local Percent = (MeshId / Frames)
-				coroutine.yield(Percent)
-			end
-		end
-		Meshes[MeshId]:BuildFromTriangles(meshData)
-		Meshes["Compleated "..MeshId] = true
-	end
-	messege("Done Generating, took: "..string.format("%.2f",(SysTime() - StartTime)).."s", MESSEGE_TYPE_SUCCESS)
+                if(verts[1] and verts[2] and verts[3] and verts[4]) then 
+                    if(!checkFails(GRange, verts[1], verts[2], verts[3])) then
+                        meshData[#meshData + 1] = {
+                            pos = verts[1],
+                            color = hsv2rgb(verts[1].Z),
+                        }
+                        meshData[#meshData + 1] = {
+                            pos = verts[2],
+                            color = hsv2rgb(verts[2].Z),
+                        }
+                        meshData[#meshData + 1] = {
+                            pos = verts[3],
+                            color = hsv2rgb(verts[3].Z),
+                        }
+                    end
+                    
+                    if(!checkFails(GRange, verts[3], verts[4], verts[1])) then
+                        meshData[#meshData + 1] = {
+                            pos = verts[3],
+                            color = hsv2rgb(verts[3].Z),
+                        }                       
+                        meshData[#meshData + 1] = {
+                            pos = verts[4],
+                            color = hsv2rgb(verts[4].Z),
+                        }
+                        meshData[#meshData + 1] = {
+                            pos = verts[1],
+                            color = hsv2rgb(verts[1].Z),
+                        }
+                    end
+                end
+            end
+            RoutineIndex = RoutineIndex + 1
+            if(RoutineIndex % 10 == 0) then
+                local Percent = (MeshId / Frames)
+                coroutine.yield(Percent)
+            end
+        end
+        Meshes[MeshId]:BuildFromTriangles(meshData)
+        Meshes["Compleated "..MeshId] = true
+    end
+    messege("Done Generating, took: "..string.format("%.2f",(SysTime() - StartTime)).."s", MESSEGE_TYPE_SUCCESS)
 end
 
 local function getCompleatedMeshes()
-	local num = 0
-	for i = 1, #Meshes do
-		if(Meshes["Compleated "..i]) then
-			num = num + 1
-		end
-	end
+    local num = 0
+    for i = 1, #Meshes do
+        if(Meshes["Compleated "..i]) then
+            num = num + 1
+        end
+    end
 
-	return num
+    return num
 end
 
 local function MeshBuildManager(a,b,c)
-	buildRoutine = coroutine.create(buildMesh, a,b,c)
-	Building = true
-	RenderMesh = false
-	coroutine.resume(buildRoutine, a,b,c)
-	timer.Create("Cocheck", 0.1, 0, function()
-		local Status = coroutine.status(buildRoutine)
-		if(Status == "dead") then
-			timer.Remove("Cocheck")
-			Building = false
-			RenderMesh = true
-			NumMeshes = getCompleatedMeshes()
-		elseif(Status == "suspended") then
-			Status, Percent = coroutine.resume(buildRoutine, a,b,c)
-		end
+    buildRoutine = coroutine.create(buildMesh, a,b,c)
+    Building = true
+    RenderMesh = false
+    coroutine.resume(buildRoutine, a,b,c)
+    timer.Create("Cocheck", 0.1, 0, function()
+        local Status = coroutine.status(buildRoutine)
+        if(Status == "dead") then
+            timer.Remove("Cocheck")
+            Building = false
+            RenderMesh = true
+            NumMeshes = getCompleatedMeshes()
+        elseif(Status == "suspended") then
+            Status, Percent = coroutine.resume(buildRoutine, a,b,c)
+        end
 
-		if(Kill) then
-			timer.Remove("Cocheck")
-			buildRoutine = nil
-			Kill = false
-			Building = false
-			RenderMesh = true
-			NumMeshes = getCompleatedMeshes()
-		end
+        if(Kill) then
+            timer.Remove("Cocheck")
+            buildRoutine = nil
+            Kill = false
+            Building = false
+            RenderMesh = true
+            NumMeshes = getCompleatedMeshes()
+        end
 
-	end)
+    end)
 end
 
+local Vec1 = Vector(-1,-1,-1)
+local Vec2 = Vector(1,1,1)
 local function generateGridVectors()
-	local Min = GridMin
-	local Max = GridMax
-	local GridPoints = {
-		X_Axis = {},
-		Y_Axis = {},
-		Z_Axis = {},
-	}
+    local GridPoints = {
+        X_Axis = {},
+        Y_Axis = {},
+        Z_Axis = {},
+    }
 
-	local Col = Color(255,0,0)
-	local TickLineIndex = 1
-	local CenterLineDrawn = false
+    local Col = Color(255,0,0)
+    local TickLineIndex = 1
+    local CenterLineDrawn = false
 
-	for X = (Min.X), Max.X, GridStep.X / 2 do
-		if(!CenterLineDrawn and X >= 0) then
-			Col = Color(255,255,255)
-			CenterLineDrawn = true
-		elseif(TickLineIndex % 2 != 0) then
-			Col = Color(50,50,50)
-		else
-			Col = Color(255,0,0)
-		end
 
-		GridPoints.X_Axis[TickLineIndex] = {}
-		GridPoints.X_Axis[TickLineIndex].Start1 = Vector(X, Min.Y, Min.Z)
-		GridPoints.X_Axis[TickLineIndex].Start2 = Vector(X, Min.Y, Min.Z)
-		GridPoints.X_Axis[TickLineIndex].End1 = Vector(X,Max.Y,Min.Z)
-		GridPoints.X_Axis[TickLineIndex].End2 = Vector(X,Min.Y,Max.Z)
-		GridPoints.X_Axis[TickLineIndex].Color = Col
-		TickLineIndex = TickLineIndex + 1
-	end
+   for X = Min.X + GridStep.X/2 , Max.X, GridStep.X/2  do
+        if(TickLineIndex % 2 != 0) then
+            Col = Color(50,50,50)
+        else
+            Col = Color(255,0,0)
+        end
 
-	TickLineIndex = 1
-	CenterLineDrawn = false
-	for Y = (Min.Y), Max.Y, GridStep.Y / 2 do
-		if(!CenterLineDrawn and Y >= 0) then
-			Col = Color(255,255,255)
-			CenterLineDrawn = true
-		elseif(TickLineIndex % 2 != 0) then
-			Col = Color(50,50,50)
-		else
-			Col = Color(0,255,0)
-		end
+        if(X != 0) then
+            GridPoints.X_Axis[TickLineIndex] = {}
+            GridPoints.X_Axis[TickLineIndex].Start1 = Vector(X, Min.Y, Min.Z)
+            GridPoints.X_Axis[TickLineIndex].Start2 = Vector(X, Min.Y, Min.Z)
+            GridPoints.X_Axis[TickLineIndex].End1 = Vector(X,Max.Y,Min.Z)
+            GridPoints.X_Axis[TickLineIndex].End2 = Vector(X,Min.Y,Max.Z)
+            GridPoints.X_Axis[TickLineIndex].Color = Col
 
-		
-		GridPoints.Y_Axis[TickLineIndex] = {}
-		GridPoints.Y_Axis[TickLineIndex].Start1 = Vector(Min.Y, Y, Min.Z)
-		GridPoints.Y_Axis[TickLineIndex].Start2 = Vector(Min.Y, Y, Min.Z)
-		GridPoints.Y_Axis[TickLineIndex].End1 = Vector(Max.Y, Y, Min.Z)
-		GridPoints.Y_Axis[TickLineIndex].End2 = Vector(Min.Y, Y, Max.Z)
-		GridPoints.Y_Axis[TickLineIndex].Color = Col
-		TickLineIndex = TickLineIndex + 1
-	end
+            if(TickLineIndex % 2 == 0) then
+                GridPoints.X_Axis[TickLineIndex].Label = tostring(X)
+            elseif(TickLineIndex == 1) then
+                GridPoints.X_Axis[TickLineIndex].Label = tostring(Min.X)
+            else
+                GridPoints.X_Axis[TickLineIndex].Label = ""
+            end
+        end
 
-	TickLineIndex = 1
-	CenterLineDrawn = false
-	for Z = (Min.Z), Max.Z, GridStep.Z / 2 do
-		if(!CenterLineDrawn and Z >= 0) then
-			Col = Color(255,255,255)
-			CenterLineDrawn = true
-		elseif(TickLineIndex % 2 != 0) then
-			Col = Color(50,50,50)
-		else
-			Col = Color(0,0,255)
-		end
 
-		GridPoints.Z_Axis[TickLineIndex] = {}
-		GridPoints.Z_Axis[TickLineIndex].Start1 = Vector(Min.X, Min.Y, Z)
-		GridPoints.Z_Axis[TickLineIndex].Start2 = Vector(Min.X, Min.Y, Z)
-		GridPoints.Z_Axis[TickLineIndex].End1 = Vector(Max.X, Min.Y, Z)
-		GridPoints.Z_Axis[TickLineIndex].End2 = Vector(Min.X, Max.Y, Z)
-		GridPoints.Z_Axis[TickLineIndex].Color = Col
-		TickLineIndex = TickLineIndex + 1
-	end
+        TickLineIndex = TickLineIndex + 1
+    end
 
-	
-	return GridPoints
+
+    TickLineIndex = 1
+    for Y = (Min.Y + GridStep.Y / 2), Max.Y, GridStep.Y / 2 do
+        if(TickLineIndex % 2 != 0) then
+            Col = Color(50,50,50)
+        else
+            Col = Color(0,255,0)
+        end
+
+        if(Y != 0) then
+            GridPoints.Y_Axis[TickLineIndex] = {}
+            GridPoints.Y_Axis[TickLineIndex].Start1 = Vector(Min.Y, Y, Min.Z)
+            GridPoints.Y_Axis[TickLineIndex].Start2 = Vector(Min.Y, Y, Min.Z)
+            GridPoints.Y_Axis[TickLineIndex].End1 = Vector(Max.Y, Y, Min.Z)
+            GridPoints.Y_Axis[TickLineIndex].End2 = Vector(Min.Y, Y, Max.Z)
+            GridPoints.Y_Axis[TickLineIndex].Color = Col
+
+            if(TickLineIndex % 2 != 0) then
+                GridPoints.Y_Axis[TickLineIndex].Label = tostring(Y)
+            else
+                GridPoints.Y_Axis[TickLineIndex].Label = ""
+            end
+        end
+        TickLineIndex = TickLineIndex + 1
+    end
+
+    TickLineIndex = 1
+    for Z = (Min.Z + GridStep.Z / 2), Max.Z, GridStep.Z / 2 do
+        if(TickLineIndex % 2 != 0) then
+            Col = Color(50,50,50)
+        else
+            Col = Color(0,0,255)
+        end
+
+        if(Z != 0) then
+            GridPoints.Z_Axis[TickLineIndex] = {}
+            GridPoints.Z_Axis[TickLineIndex].Start1 = Vector(Min.X, Min.Y, Z)
+            GridPoints.Z_Axis[TickLineIndex].Start2 = Vector(Min.X, Min.Y, Z)
+            GridPoints.Z_Axis[TickLineIndex].End1 = Vector(Max.X, Min.Y, Z)
+            GridPoints.Z_Axis[TickLineIndex].End2 = Vector(Min.X, Max.Y, Z)
+            GridPoints.Z_Axis[TickLineIndex].Color = Col
+
+            if(TickLineIndex % 2 == 0) then
+                GridPoints.Z_Axis[TickLineIndex].Label = tostring(Z)
+            else
+                GridPoints.Z_Axis[TickLineIndex].Label = ""
+            end
+        end
+
+        TickLineIndex = TickLineIndex + 1
+    end
+
+    
+    return GridPoints
 end
 
 Grid = generateGridVectors()
 
+local function drawAxis()
+    local Col = Color(255,0,0)
+
+    --X-Axis
+    render.DrawLine(Vector(Min.X,Min.Y,Min.Z), Vector(Max.X + GridStep.X / 2,Min.Y,Min.Z), Col, true)
+    render.DrawLine(Vector(Max.X,Min.Y,Min.Z), Vector(Max.X,Max.Y,Min.Z), Col, true)
+    render.DrawLine(Vector(Max.X,Min.Y,Min.Z), Vector(Max.X,Min.Y,Max.Z), Col, true)
+    Col = Color(255,255,255)
+    render.DrawLine(Vector(0,Min.Y,Min.Z), Vector(0,Max.Y,Min.Z), Col, true)
+    render.DrawLine(Vector(0,Min.Y,Min.Z), Vector(0,Min.Y,Max.Z), Col, true)
+
+    --Y-Axis
+    Col = Color(0,255,0)
+    render.DrawLine(Vector(Min.X,Min.Y,Min.Z), Vector(Min.X,Max.Y + GridStep.Y / 2,Min.Z), Col, true)
+    render.DrawLine(Vector(Min.X,Max.Y,Min.Z), Vector(Max.X,Max.Y,Min.Z), Col, true)
+    render.DrawLine(Vector(Min.X,Max.Y,Min.Z), Vector(Min.X,Max.Y,Max.Z), Col, true)
+    Col = Color(255,255,255)
+    render.DrawLine(Vector(Min.X,0,Min.Z), Vector(Max.X,0,Min.Z), Col, true)
+    render.DrawLine(Vector(Min.X,0,Min.Z), Vector(Min.X,0,Max.Z), Col, true)
+
+    --Z-Axis
+    Col = Color(0,0,255)
+    render.DrawLine(Vector(Min.X,Min.Y,Min.Z), Vector(Min.X,Min.Y,Max.Z + GridStep.X / 2), Col, true)
+    render.DrawLine(Vector(Min.X,Min.Y,Max.Z), Vector(Min.X,Max.Y,Max.Z), Col, true)
+    render.DrawLine(Vector(Min.X,Min.Y,Max.Z), Vector(Max.X,Min.Y,Max.Z), Col, true)
+    Col = Color(255,255,255)
+    render.DrawLine(Vector(Min.X,Min.Y,0), Vector(Min.X,Max.Y,0), Col, true)
+    render.DrawLine(Vector(Min.X,Min.Y,0), Vector(Max.X,Min.Y,0), Col, true)
+end
+
 local function drawGrid()
-	local Min = GridMin
-	local Max = GridMax
-	render.DrawLine(Min, Vector(Max.X + GridStep.X,Min.Y,Min.Z), Color(255,0,0), true)
-	render.DrawLine(Min, Vector(Min.X,Max.Y + GridStep.Y,Min.Z), Color(0,255,0), true)
-	render.DrawLine(Min, Vector(Min.X,Min.Y,Max.Z + GridStep.Z), Color(0,0,255), true)
+    drawAxis()
 
-	for _,Line in pairs(Grid.X_Axis) do
-		render.DrawLine(Line.Start1, Line.End1, Line.Color, true)
-		render.DrawLine(Line.Start2, Line.End2, Line.Color, true)
-	end
+    for _,Line in pairs(Grid.X_Axis) do
+        render.DrawLine(Line.Start1, Line.End1, Line.Color, true)
+        render.DrawLine(Line.Start2, Line.End2, Line.Color, true)
+        --[[if(Line.Label != "") then
+                local v = ent:LocalToWorld(Line.Start1*3)
 
-	for _,Line in pairs(Grid.Y_Axis) do
-		render.DrawLine(Line.Start1, Line.End1, Line.Color, true)
-		render.DrawLine(Line.Start2, Line.End2, Line.Color, true)
-	end
+            cam.Start3D2D(v, Angle(0,0,90), 0.1)
+                surface.SetTextColor(Color(255,0,0))
+                local w,h = surface.GetTextSize(Line.Label)
 
-	for _,Line in pairs(Grid.Z_Axis) do
-		render.DrawLine(Line.Start1, Line.End1, Line.Color, true)
-		render.DrawLine(Line.Start2, Line.End2, Line.Color, true)
-	end
+                surface.SetTextPos(0,h/2)
+                surface.SetFont("Test2")
+                surface.DrawText(Line.Label)
+            cam.End3D2D()
+
+        end]]
+    end
+
+    for _,Line in pairs(Grid.Y_Axis) do
+        render.DrawLine(Line.Start1, Line.End1, Line.Color, true)
+        render.DrawLine(Line.Start2, Line.End2, Line.Color, true)
+    end
+
+    for _,Line in pairs(Grid.Z_Axis) do
+        render.DrawLine(Line.Start1, Line.End1, Line.Color, true)
+        render.DrawLine(Line.Start2, Line.End2, Line.Color, true)
+    end
 end
 
 hook.Add("HUDPaint", "Progress Bar", function()
-	if(Building) then
-		Percent = Percent or 0
-		surface.SetDrawColor(Color(150,150,150, 150))
-		surface.DrawRect((ScrW() / 2) - 151, 10, 301, 30)
-		surface.SetDrawColor(Color(0,0,0, 150))	
-		surface.DrawOutlinedRect((ScrW() / 2) - 151, 10, 301, 30)
+    if(Building) then
+        Percent = Percent or 0
+        surface.SetDrawColor(Color(150,150,150, 150))
+        surface.DrawRect((ScrW() / 2) - 151, 10, 301, 30)
+        surface.SetDrawColor(Color(0,0,0, 150)) 
+        surface.DrawOutlinedRect((ScrW() / 2) - 151, 10, 301, 30)
 
-		surface.SetDrawColor(Color(0,255,0, 150))	
-		surface.DrawRect((ScrW() / 2) - 141, 20, 281 * (Percent or 0), 10)
-		surface.SetDrawColor(Color(0,0,0, 150))	
-		surface.DrawOutlinedRect((ScrW() / 2) - 141, 20, 281, 10)
+        surface.SetDrawColor(Color(0,255,0, 150))   
+        surface.DrawRect((ScrW() / 2) - 141, 20, 281 * (Percent or 0), 10)
+        surface.SetDrawColor(Color(0,0,0, 150)) 
+        surface.DrawOutlinedRect((ScrW() / 2) - 141, 20, 281, 10)
 
-		local w,h = surface.GetTextSize("Building Mesh: "..(Percent * 100).."%")
-		surface.SetDrawColor(Color(150,150,150, 150))
-		surface.DrawRect((ScrW() / 2) - w/2 - 10, 39, w + 20, 20)
-		surface.SetDrawColor(Color(0,0,0, 150))	
-		surface.DrawOutlinedRect((ScrW() / 2) - w/2 - 10, 39, w + 20, 20)
+        local w,h = surface.GetTextSize("Building Mesh: "..(Percent * 100).."%")
+        surface.SetDrawColor(Color(150,150,150, 150))
+        surface.DrawRect((ScrW() / 2) - w/2 - 10, 39, w + 20, 20)
+        surface.SetDrawColor(Color(0,0,0, 150)) 
+        surface.DrawOutlinedRect((ScrW() / 2) - w/2 - 10, 39, w + 20, 20)
 
-		
-		surface.SetFont("Test")
-		surface.SetTextPos((ScrW() / 2) - w/2, 42, w + 20, 20)
-		surface.SetTextColor(Color(255,255,255, 150))
-		surface.DrawText("Building Mesh: "..(Percent * 100).."%")
-	end
+        
+        surface.SetFont("Test")
+        surface.SetTextPos((ScrW() / 2) - w/2, 42, w + 20, 20)
+        surface.SetTextColor(Color(255,255,255, 150))
+        surface.DrawText("Building Mesh: "..(Percent * 100).."%")
+    end
 end)
 
 hook.Add("PostDrawOpaqueRenderables", "MeshTest", function()
-	if(IsValid(ent)) then
-		DrawMatrix:SetAngles(ent:GetAngles())
-		DrawMatrix:SetTranslation(ent:GetPos())
-		DrawMatrix:Scale(Vector(1,1,1) * 3)
-		 
-		cam.PushModelMatrix(DrawMatrix)
-			
-			if(RenderMesh) then
-				render.SetMaterial(WireMat)
+    if(IsValid(ent)) then
+        DrawMatrix:SetAngles(ent:GetAngles())
+        DrawMatrix:SetTranslation(ent:GetPos())
+        DrawMatrix:Scale(Vector(1/Ratio.X,1/Ratio.Y,1/Ratio.Z) * 3)
+         
+        cam.PushModelMatrix(DrawMatrix)
+            
+            if(RenderMesh) then
+                render.SetMaterial(WireMat)
 
-				if(RenderMode == "solid") then
-					render.SetMaterial(SolidMat)
-				elseif(RenderMode == "solid+wire") then
-					render.SetMaterial(WireHighlight)
-					Meshes[MeshIndex]:Draw()
-					render.SetMaterial(SolidMat)
-				end
+                if(RenderMode == "solid") then
+                    render.SetMaterial(SolidMat)
+                elseif(RenderMode == "solid+wire") then
+                    render.SetMaterial(WireHighlight)
+                    Meshes[MeshIndex]:Draw()
+                    render.SetMaterial(SolidMat)
+                end
+                --[[test = Matrix()
+                test:SetAngles(ent:GetAngles())
+                test:SetTranslation(ent:LocalToWorld(off2- off1))
+                test:Scale(Vector(1,1,1) * 3)
+                
 
-				Meshes[MeshIndex]:Draw()
-			end
+                cam.PushModelMatrix(test)]]
+                Meshes[MeshIndex]:Draw()
+               -- cam.PopModelMatrix()
+            end
 
-			drawGrid()
-			DrawZoomPoints()
-		cam.PopModelMatrix()
-	end
+            drawGrid()
+            DrawZoomPoints()
+        cam.PopModelMatrix()
+    end
 end)
 ---------------------------------------------------------------------------
 
 hook.Add("Think", "test", function()
-	if (!IsValid(ent) and IsValid(LocalPlayer():GetEyeTrace().Entity)) then
-		ent = LocalPlayer():GetEyeTrace().Entity
-		messege("Target Entity Selected.",MESSEGE_TYPE_NOTICE)
-	end
+    if (!IsValid(ent) and IsValid(LocalPlayer():GetEyeTrace().Entity)) then
+        ent = LocalPlayer():GetEyeTrace().Entity
+        messege("Target Entity Selected.",MESSEGE_TYPE_NOTICE)
+    end
 end)
 concommand.Add("zoomout", function(ply, name, args)
-	zoom()
-	Grid = generateGridVectors()
-	MeshBuildManager()
+    zoom()
+    Grid = generateGridVectors()
+    MeshBuildManager()
 end)
 
 concommand.Add("zoomin", function(ply, name, args)
-	zoom(-Vector(1, 1, 1), Vector(1,1,1))
-	Grid = 	generateGridVectors()
-	MeshBuildManager()	
+    zoom(Vec1, Vec2)
+    Grid =  generateGridVectors()
+    MeshBuildManager()  
 end)
 
 concommand.Add("stopgen", function()
-	if(Building) then
-		Kill = true
-		messege("Mesh generation aborted! What was made up to now will draw.",  MESSEGE_TYPE_FAIL)
-	end
+    if(Building) then
+        Kill = true
+        messege("Mesh generation aborted! What was made up to now will draw.",  MESSEGE_TYPE_FAIL)
+    end
 end)
 
 concommand.Add("graph", function(ply, name, args)
 
-	if(args[1] and args[1] != "") then
-		func = table.concat(args)
-	end
+    if(args[1] and args[1] != "") then
+        func = table.concat(args)
+    end
 
-	messege("Computing points and building mesh, possible small freeze.", MESSEGE_TYPE_WARNING)
-	timer.Remove("MeshAnim")
+    messege("Computing points and building mesh, possible small freeze.", MESSEGE_TYPE_WARNING)
+    timer.Remove("MeshAnim")
 
-	if(!generateFunctionFromText(func)) then 
-		messege("Something is wrong with your funciton! Make sure you have the correct syntax.", MESSEGE_TYPE_ERROR)
-		return false
-	end
+    if(!generateFunctionFromText(func)) then 
+        messege("Something is wrong with your funciton! Make sure you have the correct syntax.", MESSEGE_TYPE_ERROR)
+        return false
+    end
 
-	MeshBuildManager()--100, 0, 3.14159*2)
+    MeshBuildManager()--100, 0, 3.14159*2)
 
-	timer.Create("MeshAnim", TimeStep, 0, function()
-		if(dir ) then
-			if(MeshIndex < NumMeshes) then
-				MeshIndex = MeshIndex + 1
-			else
-				dir = false
-			end
-		else
-			if(MeshIndex > 1) then
-				MeshIndex = MeshIndex - 1
-			else
-				dir = true
-			end
-		end
-			
-	end)
+    timer.Create("MeshAnim", TimeStep, 0, function()
+        if(dir ) then
+            if(MeshIndex < NumMeshes) then
+                MeshIndex = MeshIndex + 1
+            else
+                dir = false
+            end
+        else
+            if(MeshIndex > 1) then
+                MeshIndex = MeshIndex - 1
+            else
+                dir = true
+            end
+        end
+            
+    end)
 end)
