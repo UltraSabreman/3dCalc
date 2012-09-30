@@ -1,14 +1,15 @@
 local func = "cos(abs(x)+abs(y))*(abs(x)+abs(y))"
-local VertexStep = Vector(0.3,0.3,0.3)
+local VertexStep = Vector(0.2,0.2,0.2)
 local Min = -Vector(3,3,3)
 local Max = Vector(3,3,3)
 
 local GridStep = Vector(1,1,1)
-local GridMin = Min
-local GridMax = Max
-local Ratio = Vector(1,1,1) --todo
+local Ratio = Vector(1,1,1)
+
 local TimeStep = 0.05
 local AxisColoring = false 
+local ScaleGridToZoom = true --When you zoom it, it makes sure that the grid still fills in the original size 
+
 local RenderMode = "wire" --"wire","solid","solid+wire",
 local dir = true
 
@@ -86,7 +87,7 @@ local MESSEGE_TYPE_NOTICE = 3
 local MESSEGE_TYPE_SUCCESS = 4
 local MESSEGE_TYPE_FAIL = 5
 
-local SolidMat = CreateMaterial("SolidFill4", "UnlitGeneric", { --VertexLitGeneric
+local SolidMat = CreateMaterial("SolidFill", "UnlitGeneric", {
     ["$basetexture"]        = "models/debug/debugwhite",
     ["$reflectivity"]       = "[0 0 0]",
     ["$vertexcolor"]        = 1,
@@ -94,7 +95,7 @@ local SolidMat = CreateMaterial("SolidFill4", "UnlitGeneric", { --VertexLitGener
     ["$nocull"]             = 1,
 })
 
-local WireHighlight = CreateMaterial("WireHighLight2", "Wireframe", {
+local WireHighlight = CreateMaterial("WireHighLight", "Wireframe", {
     ["$basetexture"]        = "editor/wireframe",
     ["$vertexcolor"]        = 0,
     ["$color"]              = "[ 0 0 0 ]",
@@ -186,7 +187,7 @@ local function DrawZoomPoints(Pos1, Pos2)
     render.DrawLine(Vector(Pos1.X, Pos2.Y, Pos2.Z), Vector(Pos2.X, Pos2.Y, Pos2.Z), col, true)
 end
 
---local off1 = Vector()
+local off1 = Vector((Min.X + Max.X)/2, (Min.Y + Max.Y)/2, (Min.Z + Max.Z)/2)
 --local off2 = Vector()
 
 local function zoom(Pos1, Pos2)
@@ -197,24 +198,18 @@ local function zoom(Pos1, Pos2)
             Min = ZoomStates[count].min
             Max = ZoomStates[count].max
             VertexStep = ZoomStates[count].step
-            GridStep = ZoomStates[count].gridstep
             Ratio = ZoomStates[count].ratio
+            off1 = ZoomStates[count].off
 
             ZoomStates[count] = nil
         else
             messege("Compleatly Zoomed Out!", MESSEGE_TYPE_NOTICE)
         end
     else
-        ZoomStates[count + 1] = {
-            min = Min,
-            max = Max,
-            step = VertexStep,
-            gridstep = GridStep,
-            ratio = Ratio
-        }
-
-        local abs = math.abs
-        local V1 = Max + Vector(abs(Min.X), abs(Min.Y), abs(Min.Z)) --get orig volume
+        if(Pos1.X == Pos2.X or Pos1.Y == Pos2.Y or Pos1.Z == Pos2.Z) then 
+            messege("Invalid Zoom Coordinates (Division By Zero!)", MESSEGE_TYPE_ERROR)
+            return
+        end
 
         --make sure pos 1 constains smallest components (can't make an inverted graph can we?)
         if(Pos2.X < Pos1.X) then
@@ -233,8 +228,28 @@ local function zoom(Pos1, Pos2)
             Pos1.Z = z
         end
 
-        local V2 = Pos2 + Vector(abs(Pos1.X), abs(Pos1.Y), abs(Pos1.Z))
+        if (Pos1 == Min and Pos2 == Max) then
+            messege("Can't Zoom in on thesame coordinates.", MESSEGE_TYPE_NOTICE)
+            return
+        end
+
+        ZoomStates[count + 1] = {
+            min = Min,
+            max = Max,
+            step = VertexStep,
+            ratio = Ratio,
+            off = off1,
+        }
+
+        local abs = math.abs
+        local V1 = Vector((Max.X),(Max.Y),(Max.Z)) - Vector((Min.X), (Min.Y), (Min.Z)) --get orig volume
+        local V2 = Vector((Pos2.X),(Pos2.Y),(Pos2.Z)) - Vector((Pos1.X), (Pos1.Y), (Pos1.Z))
+        V1 = Vector(abs(V1.X),abs(V1.Y),abs(V1.Z))
+        V2 = Vector(abs(V2.X),abs(V2.Y),abs(V2.Z))
+
         Ratio = Vector(V2.X / V1.X, V2.Y / V1.Y, V2.Z / V1.Z)
+
+
 
         print("----------------------")
         print("Min|Max: "..tostring(Min).."|"..tostring(Max))
@@ -243,13 +258,13 @@ local function zoom(Pos1, Pos2)
         print("Old VertexStep: "..tostring(VertexStep))
         print("Old GridStep: "..tostring(GridStep))
 
-        --off1 = (Pos1 - Min)
-        --off2 = (Pos2 - Max)
+        
         Min = Pos1
         Max = Pos2
+        off1 = Vector((Min.X + Max.X)/2, (Min.Y + Max.Y)/2, (Min.Z + Max.Z)/2)
 
         VertexStep = VertexStep * Ratio
-        --GridStep = Vector(GridStep.X / Ratio.X, GridStep.Y / Ratio.Y, GridStep.Z / Ratio.Z)
+        print("Offset: "..tostring(off1))
         print("New VertexStep: "..tostring(VertexStep))
         print("New GridStep: "..tostring(GridStep))
         print("----------------------")
@@ -264,7 +279,7 @@ local function checkFails(Range, ...)
     local Flag = false
 
     for i,v in pairs(verts) do
-        --Flag = (v.Z < (GridMin.Z) or v.Z > (GridMax.Z)) --todo
+        Flag = (v.Z < (Min.Z) or v.Z > (Max.Z)) --todo
 
         local dFlag
         for _,l in pairs(verts) do
@@ -273,7 +288,7 @@ local function checkFails(Range, ...)
             end
         end
 
-        --if(!Flag) then Flag = dFlag end
+        if(!Flag) then Flag = dFlag end
     end
     
     return Flag
@@ -309,7 +324,7 @@ function buildMesh(Frames, tMin, tMax)
 
         for X = Min.X, Max.X, (VertexStep.X) do
             for Y = Min.Y, Max.Y, (VertexStep.Y) do
-                local Z = math.Clamp(getZ(X,Y, (MeshId/Frames)*TRange + tMin ), Min.Z, Max.Z) --todo
+                local Z = math.Clamp(getZ(X,Y, (MeshId/Frames)*TRange + tMin ), Min.Z - VertexStep.Z, Max.Z + VertexStep.Z) --todo
 
                 if(!AxisColoring) then
                     Lowest = math.min(Lowest, Z)
@@ -423,8 +438,9 @@ local function MeshBuildManager(a,b,c)
     end)
 end
 
-local Vec1 = Vector(-1,-1,-1)
-local Vec2 = Vector(1,1,1)
+local Vec1 = Vector(-43,0,-4.34)
+local Vec2 = Vector(-24,1,4)
+
 local function generateGridVectors()
     local GridPoints = {
         X_Axis = {},
@@ -433,12 +449,12 @@ local function generateGridVectors()
     }
 
     local Col = Color(255,0,0)
-    local TickLineIndex = 1
+    local TickLineIndex = 0
     local CenterLineDrawn = false
 
 
-   for X = Min.X + GridStep.X/2 , Max.X, GridStep.X/2  do
-        if(TickLineIndex % 2 != 0) then
+   for X = Min.X +  GridStep.X/2 , Max.X - GridStep.X/2, GridStep.X/2  do
+        if(TickLineIndex % 2 == 0) then
             Col = Color(50,50,50)
         else
             Col = Color(255,0,0)
@@ -451,15 +467,14 @@ local function generateGridVectors()
             GridPoints.X_Axis[TickLineIndex].End1 = Vector(X,Max.Y,Min.Z)
             GridPoints.X_Axis[TickLineIndex].End2 = Vector(X,Min.Y,Max.Z)
             GridPoints.X_Axis[TickLineIndex].Color = Col
-
-            if(TickLineIndex % 2 == 0) then
-                GridPoints.X_Axis[TickLineIndex].Label = tostring(X)
-            elseif(TickLineIndex == 1) then
-                GridPoints.X_Axis[TickLineIndex].Label = tostring(Min.X)
-            else
-                GridPoints.X_Axis[TickLineIndex].Label = ""
-            end
         end
+
+        --[[Labels.X_Axis[TickLineIndex] = ""
+        if(TickLineIndex % 2 != 0) then
+            Labels.X_Axis[TickLineIndex] = tostring(X)
+        else
+            Labels.X_Axis[TickLineIndex] = ""
+        end]]
 
 
         TickLineIndex = TickLineIndex + 1
@@ -467,7 +482,7 @@ local function generateGridVectors()
 
 
     TickLineIndex = 1
-    for Y = (Min.Y + GridStep.Y / 2), Max.Y, GridStep.Y / 2 do
+    for Y = (Min.Y + GridStep.Y / 2), Max.Y - GridStep.Y / 2, GridStep.Y / 2 do
         if(TickLineIndex % 2 != 0) then
             Col = Color(50,50,50)
         else
@@ -476,23 +491,23 @@ local function generateGridVectors()
 
         if(Y != 0) then
             GridPoints.Y_Axis[TickLineIndex] = {}
-            GridPoints.Y_Axis[TickLineIndex].Start1 = Vector(Min.Y, Y, Min.Z)
-            GridPoints.Y_Axis[TickLineIndex].Start2 = Vector(Min.Y, Y, Min.Z)
-            GridPoints.Y_Axis[TickLineIndex].End1 = Vector(Max.Y, Y, Min.Z)
-            GridPoints.Y_Axis[TickLineIndex].End2 = Vector(Min.Y, Y, Max.Z)
+            GridPoints.Y_Axis[TickLineIndex].Start1 = Vector(Min.X, Y, Min.Z)
+            GridPoints.Y_Axis[TickLineIndex].Start2 = Vector(Min.X, Y, Min.Z)
+            GridPoints.Y_Axis[TickLineIndex].End1 = Vector(Max.X, Y, Min.Z)
+            GridPoints.Y_Axis[TickLineIndex].End2 = Vector(Min.X, Y, Max.Z)
             GridPoints.Y_Axis[TickLineIndex].Color = Col
 
-            if(TickLineIndex % 2 != 0) then
+            --[[if(TickLineIndex % 2 != 0) then
                 GridPoints.Y_Axis[TickLineIndex].Label = tostring(Y)
             else
                 GridPoints.Y_Axis[TickLineIndex].Label = ""
-            end
+            end]]
         end
         TickLineIndex = TickLineIndex + 1
     end
 
     TickLineIndex = 1
-    for Z = (Min.Z + GridStep.Z / 2), Max.Z, GridStep.Z / 2 do
+    for Z = (Min.Z + GridStep.Z / 2), Max.Z - GridStep.Z / 2, GridStep.Z / 2 do
         if(TickLineIndex % 2 != 0) then
             Col = Color(50,50,50)
         else
@@ -507,68 +522,81 @@ local function generateGridVectors()
             GridPoints.Z_Axis[TickLineIndex].End2 = Vector(Min.X, Max.Y, Z)
             GridPoints.Z_Axis[TickLineIndex].Color = Col
 
-            if(TickLineIndex % 2 == 0) then
+            --[[if(TickLineIndex % 2 == 0) then
                 GridPoints.Z_Axis[TickLineIndex].Label = tostring(Z)
             else
                 GridPoints.Z_Axis[TickLineIndex].Label = ""
-            end
+            end]]
         end
 
         TickLineIndex = TickLineIndex + 1
     end
 
     
-    return GridPoints
+    return GridPoints, Labels
 end
-
-Grid = generateGridVectors()
+local labels = {}
+Grid,labels = generateGridVectors()
 
 local function drawAxis()
     local Col = Color(255,0,0)
 
     --X-Axis
-    render.DrawLine(Vector(Min.X,Min.Y,Min.Z), Vector(Max.X + GridStep.X / 2,Min.Y,Min.Z), Col, true)
+    if (Min.X < 0 and Max.X > 0) then
+        Col = Color(255,255,255)
+        render.DrawLine(Vector(0,Min.Y,Min.Z), Vector(0,Max.Y,Min.Z), Col, true)
+        render.DrawLine(Vector(0,Min.Y,Min.Z), Vector(0,Min.Y,Max.Z), Col, true)
+    end
+
+    Col = Color(255,0,0)
+    render.DrawLine(Vector(Min.X,Min.Y,Min.Z), Vector(Max.X+(1*Ratio.X),Min.Y,Min.Z), Col, true)
     render.DrawLine(Vector(Max.X,Min.Y,Min.Z), Vector(Max.X,Max.Y,Min.Z), Col, true)
     render.DrawLine(Vector(Max.X,Min.Y,Min.Z), Vector(Max.X,Min.Y,Max.Z), Col, true)
-    Col = Color(255,255,255)
-    render.DrawLine(Vector(0,Min.Y,Min.Z), Vector(0,Max.Y,Min.Z), Col, true)
-    render.DrawLine(Vector(0,Min.Y,Min.Z), Vector(0,Min.Y,Max.Z), Col, true)
+
 
     --Y-Axis
+    if (Min.Y < 0 and Max.Y > 0) then
+        Col = Color(255,255,255)
+        render.DrawLine(Vector(Min.X,0,Min.Z), Vector(Max.X,0,Min.Z), Col, true)
+        render.DrawLine(Vector(Min.X,0,Min.Z), Vector(Min.X,0,Max.Z), Col, true)
+    end
+    
     Col = Color(0,255,0)
-    render.DrawLine(Vector(Min.X,Min.Y,Min.Z), Vector(Min.X,Max.Y + GridStep.Y / 2,Min.Z), Col, true)
+    render.DrawLine(Vector(Min.X,Min.Y,Min.Z), Vector(Min.X,Max.Y+(1*Ratio.Y),Min.Z), Col, true)
     render.DrawLine(Vector(Min.X,Max.Y,Min.Z), Vector(Max.X,Max.Y,Min.Z), Col, true)
     render.DrawLine(Vector(Min.X,Max.Y,Min.Z), Vector(Min.X,Max.Y,Max.Z), Col, true)
-    Col = Color(255,255,255)
-    render.DrawLine(Vector(Min.X,0,Min.Z), Vector(Max.X,0,Min.Z), Col, true)
-    render.DrawLine(Vector(Min.X,0,Min.Z), Vector(Min.X,0,Max.Z), Col, true)
 
     --Z-Axis
+    if (Min.Z < 0 and Max.Z > 0) then
+        Col = Color(255,255,255)
+        render.DrawLine(Vector(Min.X,Min.Y,0), Vector(Min.X,Max.Y,0), Col, true)
+        render.DrawLine(Vector(Min.X,Min.Y,0), Vector(Max.X,Min.Y,0), Col, true)
+    end
+    
     Col = Color(0,0,255)
-    render.DrawLine(Vector(Min.X,Min.Y,Min.Z), Vector(Min.X,Min.Y,Max.Z + GridStep.X / 2), Col, true)
+    render.DrawLine(Vector(Min.X,Min.Y,Min.Z), Vector(Min.X,Min.Y,Max.Z +(1*Ratio.Z)), Col, true)
     render.DrawLine(Vector(Min.X,Min.Y,Max.Z), Vector(Min.X,Max.Y,Max.Z), Col, true)
     render.DrawLine(Vector(Min.X,Min.Y,Max.Z), Vector(Max.X,Min.Y,Max.Z), Col, true)
-    Col = Color(255,255,255)
-    render.DrawLine(Vector(Min.X,Min.Y,0), Vector(Min.X,Max.Y,0), Col, true)
-    render.DrawLine(Vector(Min.X,Min.Y,0), Vector(Max.X,Min.Y,0), Col, true)
+    
 end
 
 local function drawGrid()
     drawAxis()
 
-    for _,Line in pairs(Grid.X_Axis) do
+    for i,Line in pairs(Grid.X_Axis) do
         render.DrawLine(Line.Start1, Line.End1, Line.Color, true)
         render.DrawLine(Line.Start2, Line.End2, Line.Color, true)
-        --[[if(Line.Label != "") then
-                local v = ent:LocalToWorld(Line.Start1*3)
+        --[[local Label = labels.X_Axis[i]
+        if(Label != "") then
+                local v = ent:LocalToWorld(Line.Start1)
 
             cam.Start3D2D(v, Angle(0,0,90), 0.1)
                 surface.SetTextColor(Color(255,0,0))
-                local w,h = surface.GetTextSize(Line.Label)
+                local w,h = surface.GetTextSize(Label)
 
                 surface.SetTextPos(0,h/2)
                 surface.SetFont("Test2")
-                surface.DrawText(Line.Label)
+                surface.DrawText(Label)
             cam.End3D2D()
 
         end]]
@@ -615,8 +643,10 @@ end)
 hook.Add("PostDrawOpaqueRenderables", "MeshTest", function()
     if(IsValid(ent)) then
         DrawMatrix:SetAngles(ent:GetAngles())
-        DrawMatrix:SetTranslation(ent:GetPos())
-        DrawMatrix:Scale(Vector(1/Ratio.X,1/Ratio.Y,1/Ratio.Z) * 3)
+        DrawMatrix:SetTranslation(ent:LocalToWorld(-(off1 * Vector(1/Ratio.X,1/Ratio.Y,1/Ratio.Z) * 4 )))--Vector(ent:GetPos().X/Ratio.X, ent:GetPos().Y/Ratio.Y, ent:GetPos().Z/Ratio.Z))
+        DrawMatrix:Scale(Vector(1/Ratio.X,1/Ratio.Y,1/Ratio.Z) * 4)
+        --DrawMatrix:SetTranslation(ent:GetPos())
+        --DrawMatrix:Scale(Vector(1,1,1) * 4)
          
         cam.PushModelMatrix(DrawMatrix)
             
@@ -630,15 +660,8 @@ hook.Add("PostDrawOpaqueRenderables", "MeshTest", function()
                     Meshes[MeshIndex]:Draw()
                     render.SetMaterial(SolidMat)
                 end
-                --[[test = Matrix()
-                test:SetAngles(ent:GetAngles())
-                test:SetTranslation(ent:LocalToWorld(off2- off1))
-                test:Scale(Vector(1,1,1) * 3)
-                
 
-                cam.PushModelMatrix(test)]]
                 Meshes[MeshIndex]:Draw()
-               -- cam.PopModelMatrix()
             end
 
             drawGrid()
